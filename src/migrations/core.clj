@@ -215,7 +215,6 @@
 (defn create-addresses [addresses]
   (let [filtered-addresses (remove nil? (map map-address addresses))]
     (map #(create-query %) filtered-addresses)))
-;(map identity filtered-addresses)))
 
 (defn convert-to-long [n]
   (try
