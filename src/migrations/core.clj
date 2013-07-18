@@ -222,9 +222,15 @@
     (Long/parseLong n)
     (catch Exception e nil)))
 
+(defn convert-to-empty [n]
+  (if (not (empty? n)) n nil))
+
 (defn reify-types [addr]
-  (let [long-types [:id :solicitud-id :tipo-asentamiento-id :tipo-vialidad-id :tipo-vialidad-1-id :tipo-vialidad-2-id :tipo-vialidad-posterior-id]]
-    (reduce #(assoc %1 %2 (convert-to-long (get %1 %2))) addr long-types)))
+  (let [long-types  [:id :solicitud-id :tipo-asentamiento-id :tipo-vialidad-id :tipo-vialidad-1-id :tipo-vialidad-2-id :tipo-vialidad-posterior-id]
+        empty-types [:calle :localidad :numero-exterior :numero-exterior-2 :vialidad-1 :vialidad-2 :vialidad-posterior]
+        long-converted  (reduce #(assoc %1 %2 (convert-to-long  (get %1 %2))) addr long-types)
+        empty-converted (reduce #(assoc %1 %2 (convert-to-empty (get %1 %2))) long-converted empty-types)]
+    empty-converted))
 
 (defn read-addr [file]
   (filter is-valid-addr? (map #(reify-types (apply ->Direccion %)) (csv/read-csv (slurp file)))))
