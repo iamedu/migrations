@@ -12,10 +12,20 @@
    :subname     "@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=SERVFIRMA)))"
    :make-pool?  true})
 
-(declare postal-codes)
+(declare postal-codes addrs states municipalities settlements solicitudes)
 
 (korma/defentity postal-codes
+  (korma/has-one settlements {:fk :ID_ASENTAMIENTO})
   (korma/table :CAT_SEPOMEX_CP))
+
+(korma/defentity settlements
+  (korma/table :CAT_SEPOMEX_ASENTAMIENTO))
+
+(korma/defentity addrs
+  (korma/table :DIRECCION))
+
+(korma/defentity solicitudes
+  (korma/table :SOLICITUD))
 
 (korma/defentity states
   (korma/pk :SCO_ID)
@@ -111,6 +121,10 @@
     (korma/where {(korma/raw(translate-column column)) (korma/raw (translate data))})
     (korma/exec)))
 
+(defn find-by-col [table c v]
+  (korma/select table
+                (korma/where {c v})))
+
 (def find-states (partial find-normalized states "NOMBRE"))
 
 (def find-postal-codes (partial find-normalized postal-codes "CODIGO_POSTAL"))
@@ -151,7 +165,8 @@
        :tipo-vialidad-posterior-id tipo-vialidad-posterior-id
        :full-postal-code postal-code
        :full-municipio municipio
-       :full-estado estado])))
+       :full-estado estado
+       :full-asentamiento (first (find-by-col settlements :ID (get postal-code :ID_TIPO_ASENTAMIENTO)))])))
 
 (defn map-address [{:keys [solicitud-id
                            id
@@ -159,7 +174,6 @@
                            codigo-postal
                            colonia
                            descripcion
-                           localidad
                            numero-exterior
                            numero-exterior-2
                            numero-interior
@@ -187,7 +201,6 @@
                             codigo-postal
                             colonia
                             descripcion
-                            localidad
                             numero-exterior
                             numero-exterior-2
                             numero-interior
@@ -201,38 +214,73 @@
                             tipo-vialidad-1-id
                             tipo-vialidad-2-id
                             tipo-vialidad-posterior-id
-                            full-postal-code]
+                            full-postal-code
+                            full-asentamiento]
                      :or {calle              "Calle"
-                          localidad          "Localidad"
                           numero-exterior    "Num. Ext."
                           numero-exterior-2  "Num. Ext. 2"
                           vialidad-1         "Vialidad 1"
                           vialidad-2         "Vialidad 2"
                           vialidad-posterior "Vialidad posterior"}
                      :as addr}]
-  (identity 1))
+  (kormadb/transaction
+    (let [next-seq (first (korma/exec-raw ["SELECT DIR_SEQ.NEXTVAL FROM DUAL"] :results))
+          next-id  (:NEXTVAL next-seq)
+          insert-count  (korma/insert addrs
+                                 (korma/values {:ID next-id
+                                                :DATE_CREATED (korma/raw "SYSDATE")
+                                                :LAST_UPDATED (korma/raw "SYSDATE")
+                                                :VERSION 0
+                                                :CODIGO_POSTAL (get full-postal-code :CODIGO_POSTAL)
+                                                :CALLE calle
+                                                :ASENTAMIENTO (get full-asentamiento :NOMBRE)
+                                                :ID_ASENTAMIENTO (get full-asentamiento :ID)
+                                                :ID_TIPO_VIALIDAD tipo-vialidad-id
+                                                :NUMERO_EXTERIOR1 numero-exterior
+                                                :NUMERO_EXTERIOR2 numero-exterior-2
+                                                :NUMERO_INTERIOR  numero-interior
+                                                :NOMBRE_VIALIDAD1 vialidad-1
+                                                :ID_TIPO_VIALIDAD1 tipo-vialidad-1-id
+                                                :NOMBRE_VIALIDAD2 vialidad-2
+                                                :ID_TIPO_VIALIDAD2 tipo-vialidad-2-id
+                                                :NOMBRE_VIALIDAD_POSTERIOR vialidad-posterior
+                                                :ID_TIPO_VIALIDAD_POSTERIOR tipo-vialidad-posterior-id
+                                                :REFERENCIAS descripcion
+                                                :ID_ESTADO estado
+                                                :ID_MUNICIPIO municipio
+                                                :ID_TIPO_ASENTAMIENTO tipo-asentamiento-id}))
+          update-count (korma/update solicitudes
+                                       (korma/set-fields {:ID_DIRECCION next-id})
+                                       (korma/where {:ID solicitud-id}))]
+    (if (= insert-count update-count 1)
+      {:id next-id :address-count insert-count :update-count update-count :status :correct :addr addr}  
+      (do
+        (kormadb/rollback)
+        {:id next-id :address-count insert-count :update-count update-count :status :error :addr addr})))))
 
 (defn create-addresses [addresses]
   (let [filtered-addresses (remove nil? (map map-address addresses))]
-    (map #(create-query %) filtered-addresses)))
+    (pmap #(create-query %) filtered-addresses)))
 
 (defn convert-to-long [n]
   (try
     (Long/parseLong n)
     (catch Exception e nil)))
 
-(defn convert-to-empty [n]
-  (if (not (empty? n)) n nil))
-
 (defn reify-types [addr]
   (let [long-types  [:id :solicitud-id :tipo-asentamiento-id :tipo-vialidad-id :tipo-vialidad-1-id :tipo-vialidad-2-id :tipo-vialidad-posterior-id]
-        empty-types [:calle :localidad :numero-exterior :numero-exterior-2 :vialidad-1 :vialidad-2 :vialidad-posterior]
+        empty-types [:calle :numero-exterior :numero-exterior-2 :vialidad-1 :vialidad-2 :vialidad-posterior]
         long-converted  (reduce #(assoc %1 %2 (convert-to-long  (get %1 %2))) addr long-types)
-        empty-converted (reduce #(assoc %1 %2 (convert-to-empty (get %1 %2))) long-converted empty-types)]
+        empty-converted (reduce #(if (or (empty? (get %1 %2)) (nil? (get %1 %2))) (dissoc %1 %2) %1) long-converted empty-types)]
     empty-converted))
 
 (defn read-addr [file]
   (filter is-valid-addr? (map #(reify-types (apply ->Direccion %)) (csv/read-csv (slurp file)))))
+
+(defn write-errors [results]
+  (let [errors (filter #(= :error (:status %)) results)
+        addresses (map :addr errors)]
+    (spit "errores.edn" (prn-str addresses))))
 
 (defn -main
   "I don't do a whole lot ... yet."
