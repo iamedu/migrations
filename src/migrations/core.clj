@@ -32,7 +32,7 @@
   (korma/table :CAT_ENTIDAD_FEDERATIVA))
 
 (korma/defentity municipalities
-  (korma/pk :SCO_ID)
+  (korma/pk :ID)
   (korma/table :CAT_MUNICIPIO))
 
 (defrecord Direccion
