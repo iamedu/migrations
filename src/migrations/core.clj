@@ -4,19 +4,12 @@
             [korma.core :as korma])
   (:gen-class))
 
-;; (kormadb/defdb inadem-db
-;;   {:classname   "oracle.jdbc.driver.OracleDriver" ; must be in classpath
-;;    :subprotocol "oracle:thin"
-;;    :user        "FPYME_LECT"
-;;    :password    "Ks0804sdF"
-;;    :subname     "@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=SERVFIRMA)))"
-;;    :make-pool?  true})
 (kormadb/defdb inadem-db
   {:classname   "oracle.jdbc.driver.OracleDriver" ; must be in classpath
    :subprotocol "oracle:thin"
-   :user        "fpyme"
-   :password    "fpyme"
-   :subname     "@inademdb.ediaz.me:1521:XE"
+   :user        "FPYME_LECT"
+   :password    "Ks0804sdF"
+   :subname     "@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=SERVFIRMA)))"
    :make-pool?  true})
 
 (declare postal-codes addrs states municipalities settlements solicitudes)
