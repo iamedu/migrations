@@ -168,26 +168,7 @@
        :full-estado estado
        :full-asentamiento (first (find-by-col settlements :ID (get postal-code :ID_TIPO_ASENTAMIENTO)))])))
 
-(defn map-address [{:keys [solicitud-id
-                           id
-                           calle
-                           codigo-postal
-                           colonia
-                           descripcion
-                           numero-exterior
-                           numero-exterior-2
-                           numero-interior
-                           vialidad-1
-                           vialidad-2
-                           vialidad-posterior
-                           estado
-                           municipio
-                           tipo-asentamiento-id
-                           tipo-vialidad-id
-                           tipo-vialidad-1-id
-                           tipo-vialidad-2-id
-                           tipo-vialidad-posterior-id]
-                    :as addr}]
+(defn map-address [addr]
   (try
     (apply assoc addr (find-data addr))
     (catch AssertionError e
