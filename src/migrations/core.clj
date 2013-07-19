@@ -232,7 +232,7 @@
                                                 :ID_TIPO_ASENTAMIENTO tipo-asentamiento-id}))
           update-count (korma/update solicitudes
                                        (korma/set-fields {:ID_DIRECCION next-id})
-                                       (korma/where {:ID solicitud-id}))]
+                                       (korma/where {:TMP solicitud-id}))]
     (if (= insert-count update-count 1)
       {:id next-id :address-count insert-count :update-count update-count :status :correct :addr addr}  
       (do
